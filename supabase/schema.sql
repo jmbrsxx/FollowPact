@@ -178,6 +178,13 @@ alter table public.email_events enable row level security;
 alter table public.conversion_events enable row level security;
 alter table public.api_rate_limits enable row level security;
 
+-- Secret API keys use service_role, which bypasses RLS but still needs SQL privileges.
+grant usage on schema public to service_role;
+grant select, insert, update on public.waitlist, public.orders, public.stripe_events,
+  public.email_events, public.conversion_events, public.api_rate_limits to service_role;
+grant select on public.conversion_summary to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
 revoke all on function public.join_waitlist(text, text, text, text, text, boolean) from public, anon, authenticated;
 revoke all on function public.check_api_rate_limit(text, integer, integer) from public, anon, authenticated;
 revoke all on function public.claim_stripe_event(text, text) from public, anon, authenticated;

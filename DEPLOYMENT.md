@@ -6,7 +6,8 @@ This project is designed for a zero-monthly-fee launch on `followpact.netlify.ap
 
 1. Create a Supabase Free project.
 2. Open its SQL editor and run `supabase/schema.sql` once. Re-running it is safe for the included tables and functions.
-3. Copy the project URL and service-role key into Netlify as `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+3. Copy the project URL (for example `https://PROJECT_REF.supabase.co`, without `/rest/v1`) and the secret service-role key into Netlify as `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+   For an existing project that returns `permission denied for table orders`, run `supabase/fix-service-role-grants.sql` in the Supabase SQL editor. The schema grants the server role SQL privileges as well as RLS bypass.
 4. Generate a long random `RATE_LIMIT_SALT`. The waitlist hashes IP addresses with this secret for a fixed-window limit of five attempts per minute; raw IP addresses are never stored.
 
 Row Level Security is enabled and no anonymous policies are created. Browser code must never receive the service-role key.
@@ -74,6 +75,8 @@ Use Cloudflare’s dashboard for page views, visitors, referrers, countries, bro
 3. Add every value from `.env.example` under Site configuration → Environment variables. Use `https://followpact.netlify.app` for `NEXT_PUBLIC_SITE_URL`.
 4. Generate long random values for `ADMIN_API_TOKEN`, `BREVO_WEBHOOK_TOKEN`, and `RATE_LIMIT_SALT`.
 5. Deploy, then update Stripe and Brevo webhook URLs if Netlify assigned a different site name.
+
+If the site shows “waitlist temporarily unavailable” and checkout redirects to “unavailable,” check `GET /api/offer-status` and the Netlify function logs. HTTP 503 there means the server cannot read Supabase; confirm the Netlify runtime values for `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, run the grants repair above if needed, and redeploy. Test-mode Stripe links are only for test purchases. Before accepting real payments, set the live `STRIPE_FOUNDING_PAYMENT_LINK`, `STRIPE_MONTHLY_PAYMENT_LINK`, live Price IDs, live secret key, and live webhook secret in Netlify together.
 
 Enable Netlify’s included observability and function logs for short-term debugging. Cloudflare remains the primary traffic dashboard. Netlify Free uses a hard monthly credit limit and can pause the site rather than create an unexpected bill. Supabase Free can pause inactive projects and has no production uptime guarantee or automatic backups.
 

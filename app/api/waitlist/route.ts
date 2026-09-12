@@ -31,7 +31,8 @@ export async function POST(request: Request) {
 
   try {
     if (await isRateLimited(request)) return NextResponse.json({ error: "Too many attempts. Please wait a minute and try again." }, { status: 429 });
-  } catch {
+  } catch (error) {
+    console.error("Waitlist rate-limit check failed", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "The waitlist is temporarily unavailable. Please try again." }, { status: 503 });
   }
 
@@ -63,7 +64,8 @@ export async function POST(request: Request) {
       p_utm_campaign: utmCampaign,
       p_marketing_consent: true,
     });
-  } catch {
+  } catch (error) {
+    console.error("Waitlist signup failed", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "We couldn't save your email. Please try again." }, { status: 502 });
   }
 
