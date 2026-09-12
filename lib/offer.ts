@@ -11,5 +11,5 @@ export async function getOfferStatus() {
 }
 
 export function getCheckoutUrl(isOpen: boolean) {
-  return isOpen ? process.env.STRIPE_FOUNDING_PAYMENT_LINK : process.env.STRIPE_MONTHLY_PAYMENT_LINK;
+  return isOpen ? process.env.STRIPE_FOUNDING_PAYMENT_LINK : undefined;
 }

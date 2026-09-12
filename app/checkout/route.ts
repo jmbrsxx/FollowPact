@@ -11,11 +11,11 @@ export async function GET(request: Request) {
     const referrerHeader = request.headers.get("referer");
     const referrer = referrerHeader ? new URL(referrerHeader) : null;
     const status = await getOfferStatus();
+    if (!status.isOpen) return NextResponse.redirect(new URL("/#waitlist", request.url), 303);
     const checkoutUrl = getCheckoutUrl(status.isOpen);
     if (!checkoutUrl) return NextResponse.redirect(new URL("/payment/unavailable", request.url), 303);
 
-    const kind = status.isOpen ? "founding" : "subscription";
-    const cookieName = `fp_checkout_${kind}`;
+    const cookieName = "fp_checkout_founding";
     const alreadyRecorded = request.headers.get("cookie")?.split(";").some((part) => part.trim().startsWith(`${cookieName}=`));
     if (!alreadyRecorded) {
       await recordConversionSafely("checkout_started", {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         utmSource: requestUrl.searchParams.get("utm_source") || referrer?.searchParams.get("utm_source"),
         utmMedium: requestUrl.searchParams.get("utm_medium") || referrer?.searchParams.get("utm_medium"),
         utmCampaign: requestUrl.searchParams.get("utm_campaign") || referrer?.searchParams.get("utm_campaign"),
-        referenceId: kind,
+        referenceId: "founding",
       });
     }
 

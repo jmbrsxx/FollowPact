@@ -16,8 +16,8 @@ export default function CheckoutButton() {
   }, []);
 
   return (
-    <a className="button button-primary" href="/checkout?source=landing-page" data-analytics="checkout">
-      {isOpen ? "Secure Founding Access — $9.99" : "Get FollowPact — $21.99/month"}
+    <a className="button button-primary" href={isOpen ? "/checkout?source=landing-page" : "/#waitlist"} data-analytics={isOpen ? "checkout" : undefined}>
+      {isOpen ? "Secure Founding Access — $9.99" : "Join the free waitlist"}
       <span aria-hidden="true">↗</span>
     </a>
   );

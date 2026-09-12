@@ -16,16 +16,15 @@ The `conversion_summary` view gives event totals. The protected `GET /api/admin/
 
 ## 2. Stripe
 
-Create these products and prices in Stripe test mode first:
+Create this product and price in Stripe test mode first:
 
 - Founding access: `$9.99 USD`, one time. Set its Payment Link purchase limit to 10 completed purchases.
-- Regular access: `$21.99 USD`, recurring monthly.
 
-For both Payment Links, require customer email, enable Stripe receipts, and use this post-payment redirect:
+For the founding Payment Link, require customer email, enable Stripe receipts, and use this post-payment redirect:
 
 `https://followpact.netlify.app/payment/success?session_id={CHECKOUT_SESSION_ID}`
 
-Set the links and Price IDs as `STRIPE_FOUNDING_PAYMENT_LINK`, `STRIPE_MONTHLY_PAYMENT_LINK`, `STRIPE_FOUNDING_PRICE_ID`, and `STRIPE_MONTHLY_PRICE_ID`. Set the test secret key as `STRIPE_SECRET_KEY`.
+Set the link and Price ID as `STRIPE_FOUNDING_PAYMENT_LINK` and `STRIPE_FOUNDING_PRICE_ID`. Set the test secret key as `STRIPE_SECRET_KEY`. The site offers only this one-time checkout for now; when the founding offer ends or sells out, checkout directs visitors to the waitlist.
 
 Create a webhook endpoint at:
 
@@ -38,13 +37,10 @@ Subscribe it to:
 - `checkout.session.async_payment_failed`
 - `checkout.session.expired`
 - `charge.refunded`
-- `invoice.paid`
-- `invoice.payment_failed`
-- `customer.subscription.deleted`
 
 Save its signing secret as `STRIPE_WEBHOOK_SECRET`. Stripe webhooks—not the success page—fulfill orders. Event IDs and Checkout Session IDs are unique in Supabase, so Stripe retries do not consume another seat or send fulfillment twice.
 
-Before launch, repeat the setup in live mode and replace every test key, Price ID, link, and webhook secret together. Run one low-value live purchase and refund. Founding purchases never convert to the monthly subscription automatically.
+Before launch, repeat the setup in live mode and replace the test key, Price ID, link, and webhook secret together. Run one low-value live purchase and refund. Founding purchases never convert to a subscription automatically.
 
 ## 3. Brevo and Gmail replies
 
@@ -76,7 +72,7 @@ Use Cloudflare’s dashboard for page views, visitors, referrers, countries, bro
 4. Generate long random values for `ADMIN_API_TOKEN`, `BREVO_WEBHOOK_TOKEN`, and `RATE_LIMIT_SALT`.
 5. Deploy, then update Stripe and Brevo webhook URLs if Netlify assigned a different site name.
 
-If the site shows “waitlist temporarily unavailable” and checkout redirects to “unavailable,” check `GET /api/offer-status` and the Netlify function logs. HTTP 503 there means the server cannot read Supabase; confirm the Netlify runtime values for `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, run the grants repair above if needed, and redeploy. Test-mode Stripe links are only for test purchases. Before accepting real payments, set the live `STRIPE_FOUNDING_PAYMENT_LINK`, `STRIPE_MONTHLY_PAYMENT_LINK`, live Price IDs, live secret key, and live webhook secret in Netlify together.
+If the site shows “waitlist temporarily unavailable” and checkout redirects to “unavailable,” check `GET /api/offer-status` and the Netlify function logs. HTTP 503 there means the server cannot read Supabase; confirm the Netlify runtime values for `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, run the grants repair above if needed, and redeploy. Test-mode Stripe links are only for test purchases. Before accepting real payments, set the live `STRIPE_FOUNDING_PAYMENT_LINK`, `STRIPE_FOUNDING_PRICE_ID`, `STRIPE_SECRET_KEY`, and `STRIPE_WEBHOOK_SECRET` in Netlify together. No monthly link is needed for this launch.
 
 Enable Netlify’s included observability and function logs for short-term debugging. Cloudflare remains the primary traffic dashboard. Netlify Free uses a hard monthly credit limit and can pause the site rather than create an unexpected bill. Supabase Free can pause inactive projects and has no production uptime guarantee or automatic backups.
 
@@ -91,6 +87,6 @@ npm run build
 
 Test the waitlist with valid and invalid email addresses, missing consent, a filled honeypot, sixth request in one minute, duplicate signup, resubscription, disabled Supabase, disabled Brevo, retry, confirmation delivery, and an unsubscribe webhook.
 
-Use Stripe CLI and test cards for successful, declined, delayed, and failed payments; an invalid signature; duplicate webhook delivery; refund; subscription renewal/failure/cancellation; the tenth founding purchase; and closure after the deadline. Verify an eleventh founding checkout cannot complete through Stripe’s purchase limit and that `/checkout` switches to the monthly link.
+Use Stripe CLI and test cards for successful, declined, delayed, and failed payments; an invalid signature; duplicate webhook delivery; refund; the tenth founding purchase; and closure after the deadline. Verify an eleventh founding checkout cannot complete through Stripe’s purchase limit and that `/checkout` directs visitors to the waitlist after the offer closes.
 
 Verify the Cloudflare beacon is absent with no public token and visible after configuration. Confirm UTM values are sanitized, checkout starts are recorded, purchase conversions appear only after a verified payment webhook, and secrets do not appear in browser bundles or API responses.
