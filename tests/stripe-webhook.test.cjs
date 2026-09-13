@@ -86,7 +86,7 @@ function setup() {
     }) },
     '@/lib/founding-payment': helperExports,
     '@/lib/brevo': {
-      getBrevoTemplateId: () => 1,
+      getBrevoTemplateId: (kind) => kind === 'purchase_confirmation' ? null : 1,
       syncBrevoContact: async () => null,
       sendTrackedEmail: async (email, kind) => { state.emails.push({ email, kind }); },
     },
@@ -123,7 +123,7 @@ test('successful one-time payment creates one paid Founder and appropriate email
   assert.equal((await post('checkout.session.completed', session('success'))).status, 200);
   assert.equal(state.orders.size, 1);
   assert.equal(state.orders.get('success').status, 'paid');
-  assert.deepEqual(state.emails.map(x => x.kind), ['purchase_confirmation', 'beta_access']);
+  assert.deepEqual(state.emails.map(x => x.kind), ['purchase_confirmation']);
   assert.deepEqual(state.conversions, ['founding_purchase_completed']);
 });
 
@@ -135,7 +135,7 @@ test('duplicate delivery is acknowledged without duplicate order or fulfillment'
   assert.equal(duplicate.status, 200);
   assert.equal(duplicate.body.duplicate, true);
   assert.equal(state.orders.size, 1);
-  assert.equal(state.emails.length, 2);
+  assert.equal(state.emails.length, 1);
   assert.equal(state.conversions.length, 1);
 });
 
@@ -147,7 +147,7 @@ test('pending checkout does not grant Founder access or send confirmation', asyn
   assert.equal(state.conversions.length, 0);
   assert.equal((await post('checkout.session.async_payment_succeeded', session('pending'))).status, 200);
   assert.equal(state.orders.get('pending').status, 'paid');
-  assert.equal(state.emails.length, 2);
+  assert.equal(state.emails.length, 1);
 });
 
 test('failed asynchronous payment never creates a paid Founder', async () => {
@@ -249,5 +249,5 @@ test('processing failure receives HTTP 500, then retry does not duplicate fulfil
   state.failMark = false;
   assert.equal((await post('checkout.session.completed', session('retry'), 'evt_retry')).status, 200);
   assert.equal(state.orders.size, 1);
-  assert.equal(state.emails.length, 2);
+  assert.equal(state.emails.length, 1);
 });

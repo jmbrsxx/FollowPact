@@ -75,15 +75,12 @@ async function handleCheckoutFailure(session: Stripe.Checkout.Session) {
 
 async function sendPurchaseMessages(email: string, kind: "founding" | "subscription") {
   await syncBrevoContact(email, null).catch((error) => console.error("Purchaser contact sync failed", error));
-  const confirmationTemplate = getBrevoTemplateId("purchase_confirmation");
+  const confirmationTemplate = getBrevoTemplateId("purchase_confirmation") ||
+    (kind === "founding" ? getBrevoTemplateId("beta_access") : null);
   if (confirmationTemplate) {
-    await sendTrackedEmail(email, "purchase_confirmation", confirmationTemplate, { product: kind }).catch((error) => console.error("Purchase email failed", error));
-  }
-  if (kind === "founding") {
-    const accessTemplate = getBrevoTemplateId("beta_access");
-    if (accessTemplate) {
-      await sendTrackedEmail(email, "beta_access", accessTemplate, { betaDate: "October 5, 2026", releaseDate: "November 5, 2026" }).catch((error) => console.error("Access email failed", error));
-    }
+    await sendTrackedEmail(email, "purchase_confirmation", confirmationTemplate, {
+      product: kind, betaDate: "October 5, 2026", releaseDate: "November 5, 2026",
+    }).catch((error) => console.error("Purchase email failed", error));
   }
 }
 

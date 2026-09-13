@@ -53,15 +53,17 @@ export async function sendTrackedEmail(email: string, kind: EmailKind, templateI
     }),
   });
 
-  const payload = (await response.json().catch(() => ({}))) as { messageId?: string };
+  const payload = (await response.json().catch(() => ({}))) as { messageId?: string; code?: string; message?: string };
   const status = response.ok ? "sent" : "failed";
+  const providerReason = [payload.code, payload.message].filter(Boolean).join(": ").replace(/[\r\n]+/g, " ").slice(0, 200);
+  const lastError = response.ok ? null : `Brevo HTTP ${response.status}${providerReason ? `: ${providerReason}` : ""}`;
   await supabaseRequest("email_events", {
     method: "POST",
     headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ recipient_email: email, email_kind: kind, provider_message_id: payload.messageId || null, status, last_error: response.ok ? null : `Brevo HTTP ${response.status}` }),
+    body: JSON.stringify({ recipient_email: email, email_kind: kind, provider_message_id: payload.messageId || null, status, last_error: lastError }),
   }).catch(() => undefined);
 
-  if (!response.ok) throw new Error(`Brevo email send failed (${response.status})`);
+  if (!response.ok) throw new Error(`Brevo email send failed (${response.status})${providerReason ? `: ${providerReason}` : ""}`);
   return payload.messageId || null;
 }
 

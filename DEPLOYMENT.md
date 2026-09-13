@@ -52,9 +52,10 @@ Before launch, repeat the setup in live mode and replace the test key, Price ID,
 ## 3. Brevo and Gmail replies
 
 1. Create a Brevo Free account and a marketing list.
-2. Create transactional templates for waitlist confirmation, purchase confirmation, beta access, failed payments, and refunds.
+2. Create transactional templates for waitlist confirmation, purchase confirmation, failed payments, and refunds. For this founding presale, `BREVO_BETA_ACCESS_TEMPLATE_ID` may supply the purchase-confirmation template when `BREVO_PURCHASE_TEMPLATE_ID` is empty; the webhook sends one confirmation email after a verified payment. Send actual beta access details separately when the beta is ready.
 3. Set the API key, list ID, and template IDs using the names in `.env.example`.
 4. Set `BREVO_SENDER_EMAIL` to a sender Brevo accepts, `BREVO_SENDER_NAME=FollowPact`, and `BREVO_REPLY_TO_EMAIL=followpact@gmail.com`.
+   The current Brevo account's active template 3 already confirms the founding purchase and works as the fallback confirmation. Active template 5 is the refund confirmation. Stripe test purchases made with `example.com` addresses can hard-bounce and become blocked in Brevo; use an inbox you control when checking actual delivery. `email_events.last_error` records Brevo's response code and message for rejected API requests.
 5. Generate a random `BREVO_WEBHOOK_TOKEN`. Create transactional and marketing Brevo event webhooks pointing to `https://followpact.netlify.app/api/brevo/webhook`. Add a custom `Authorization` header with the value `Bearer <BREVO_WEBHOOK_TOKEN>` to both webhooks. Enable delivered, hard/soft bounce, blocked, spam/complaint, and unsubscribe events where available.
 
 Without an owned domain, Gmail or `netlify.app` cannot be authenticated as a bulk-sending domain. Accept Brevo’s managed sender behavior and branding. Replies still go to Gmail. Brevo Free currently limits sending to 300 emails per day.
