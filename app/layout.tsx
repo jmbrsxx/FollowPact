@@ -7,12 +7,12 @@ const metadataBase = siteUrl ? new URL(siteUrl) : undefined;
 
 export const metadata: Metadata = {
   metadataBase,
-  title: "FollowPact — A freelancer operating system for developers",
-  description: "Organize client work, plan available time, track outreach and payments, and protect new projects before work begins.",
-  keywords: ["freelancer operating system", "freelance developer project tracker", "invoice tracker", "outreach tracker", "project time planner"],
+  title: "The Project ERP for Freelance Developers | FollowPact",
+  description: "Stop scope creep, track hours, and secure upfront approval in one dashboard.",
+  keywords: ["freelance developer project ERP", "Client Scope-Lock", "freelance invoice tracker", "project time planner", "freelancer operating system"],
   alternates: siteUrl ? { canonical: "/" } : undefined,
-  openGraph: { title: "Ship the work you keep putting off | FollowPact", description: "One lightweight operating system for freelance developers: client work, time, invoices, outreach, and project scope.", type: "website", ...(siteUrl ? { url: "/", images: [{ url: "/og.png", width: 1536, height: 1024, alt: "FollowPact freelancer operating system" }] } : {}) },
-  twitter: { card: "summary_large_image", title: "FollowPact — Built for freelance developers", description: "Client work, time, invoices, outreach, and project scope in one lightweight system.", ...(siteUrl ? { images: ["/og.png"] } : {}) },
+  openGraph: { title: "The Project ERP for Freelance Developers | FollowPact", description: "Stop scope creep, track hours, and secure upfront approval in one dashboard.", type: "website", ...(siteUrl ? { url: "/", images: [{ url: "/og.png", width: 1536, height: 1024, alt: "FollowPact project dashboard" }] } : {}) },
+  twitter: { card: "summary_large_image", title: "The Project ERP for Freelance Developers | FollowPact", description: "Stop scope creep, track hours, and secure upfront approval in one dashboard.", ...(siteUrl ? { images: ["/og.png"] } : {}) },
   icons: { icon: "/followpact-logo.png", shortcut: "/followpact-logo.png", apple: "/followpact-logo.png" },
 };
 
