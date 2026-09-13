@@ -1,3 +1,4 @@
+import "server-only";
 import { supabaseRequest } from "./supabase";
 
 type EmailKind = "waitlist_confirmation" | "purchase_confirmation" | "beta_access" | "payment_failed" | "refund_confirmation";

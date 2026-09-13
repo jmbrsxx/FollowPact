@@ -1,3 +1,5 @@
+import "server-only";
+
 // Accept either the project URL or the REST URL copied from Supabase settings.
 const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

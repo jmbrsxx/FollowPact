@@ -94,7 +94,7 @@ create table if not exists public.api_rate_limits (
 
 create or replace function public.join_waitlist(p_email text, p_source text, p_utm_source text, p_utm_medium text, p_utm_campaign text, p_marketing_consent boolean)
 returns table (result_email text, should_send_confirmation boolean)
-language plpgsql security definer set search_path = public
+language plpgsql security definer set search_path = ''
 as $$
 declare existing_status text;
 begin
@@ -118,7 +118,7 @@ end;
 $$;
 
 create or replace function public.check_api_rate_limit(p_rate_key text, p_limit integer default 5, p_window_seconds integer default 60)
-returns boolean language plpgsql security definer set search_path = public
+returns boolean language plpgsql security definer set search_path = ''
 as $$
 declare
   current_bucket timestamptz := to_timestamp(floor(extract(epoch from now()) / p_window_seconds) * p_window_seconds);
@@ -132,7 +132,7 @@ end;
 $$;
 
 create or replace function public.claim_stripe_event(p_event_id text, p_event_type text)
-returns boolean language plpgsql security definer set search_path = public
+returns boolean language plpgsql security definer set search_path = ''
 as $$
 begin
   insert into public.stripe_events (event_id, event_type, status)
@@ -148,7 +148,7 @@ end;
 $$;
 
 create or replace function public.record_paid_order(p_email text, p_checkout_session_id text, p_customer_id text, p_payment_intent_id text, p_subscription_id text, p_price_id text, p_kind text, p_amount_total integer, p_currency text)
-returns boolean language plpgsql security definer set search_path = public
+returns boolean language plpgsql security definer set search_path = ''
 as $$
 declare was_fulfilled boolean;
 begin
@@ -168,7 +168,7 @@ begin
 end;
 $$;
 
-create or replace view public.conversion_summary as
+create or replace view public.conversion_summary with (security_invoker = true) as
 select event_name, count(*)::bigint as total, min(occurred_at) as first_event_at, max(occurred_at) as latest_event_at
 from public.conversion_events group by event_name;
 
@@ -178,6 +178,11 @@ alter table public.stripe_events enable row level security;
 alter table public.email_events enable row level security;
 alter table public.conversion_events enable row level security;
 alter table public.api_rate_limits enable row level security;
+
+-- Views can bypass table RLS unless they run as the invoker. Restrict SQL grants too.
+revoke all on public.waitlist, public.orders, public.stripe_events, public.email_events,
+  public.conversion_events, public.api_rate_limits, public.conversion_summary
+  from public, anon, authenticated;
 
 -- Secret API keys use service_role, which bypasses RLS but still needs SQL privileges.
 grant usage on schema public to service_role;

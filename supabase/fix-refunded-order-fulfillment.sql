@@ -1,7 +1,7 @@
 -- Run once in the Supabase SQL editor for an existing FollowPact deployment.
 -- Replayed checkout events must never restore a fully refunded order to paid.
 create or replace function public.record_paid_order(p_email text, p_checkout_session_id text, p_customer_id text, p_payment_intent_id text, p_subscription_id text, p_price_id text, p_kind text, p_amount_total integer, p_currency text)
-returns boolean language plpgsql security definer set search_path = public
+returns boolean language plpgsql security definer set search_path = ''
 as $$
 declare was_fulfilled boolean;
 begin

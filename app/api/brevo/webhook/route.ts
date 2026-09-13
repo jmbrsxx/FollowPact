@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { recordConversionSafely } from "@/lib/analytics";
 import { removeBrevoContactFromMarketingList } from "@/lib/brevo";
+import { readLimitedBody, RequestBodyTooLarge } from "@/lib/request-body";
 import { supabaseRequest } from "@/lib/supabase";
 
 type BrevoEvent = {
@@ -21,9 +22,8 @@ function sameSecret(received: string, expected: string) {
 function isAuthorized(request: Request) {
   const expected = process.env.BREVO_WEBHOOK_TOKEN;
   if (!expected) return false;
-  const urlToken = new URL(request.url).searchParams.get("token");
   const auth = request.headers.get("authorization");
-  const received = auth?.startsWith("Bearer ") ? auth.slice(7) : urlToken;
+  const received = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
   return Boolean(received && sameSecret(received, expected));
 }
 
@@ -67,8 +67,9 @@ export async function POST(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    body = JSON.parse(await readLimitedBody(request, 256 * 1024));
+  } catch (error) {
+    if (error instanceof RequestBodyTooLarge) return NextResponse.json({ error: "Webhook payload is too large." }, { status: 413 });
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 

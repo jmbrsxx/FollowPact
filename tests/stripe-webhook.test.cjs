@@ -77,6 +77,10 @@ function setup() {
   const helperCompiled = ts.transpileModule(helperSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const helperExports = {};
   vm.runInNewContext(helperCompiled, { exports: helperExports, require, process });
+  const bodySource = fs.readFileSync(path.join(__dirname, '..', 'lib', 'request-body.ts'), 'utf8');
+  const bodyCompiled = ts.transpileModule(bodySource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const bodyExports = {};
+  vm.runInNewContext(bodyCompiled, { exports: bodyExports, require, process, TextDecoder });
   const mocks = {
     'next/server': { NextResponse: { json: (body, init = {}) => Response.json(body, { status: init.status || 200 }) } },
     '@/lib/supabase': { supabaseRequest, callSupabaseRpc },
@@ -85,6 +89,7 @@ function setup() {
       refunds: { list: async ({ payment_intent }) => ({ data: state.refunds.get(payment_intent) || [], has_more: false }) },
     }) },
     '@/lib/founding-payment': helperExports,
+    '@/lib/request-body': bodyExports,
     '@/lib/brevo': {
       getBrevoTemplateId: (kind) => kind === 'purchase_confirmation' ? null : 1,
       syncBrevoContact: async () => null,
@@ -105,6 +110,12 @@ function setup() {
     return { status: response.status, body: await response.json() };
   }, postUnsigned: async () => {
     const response = await exports.POST(new Request('http://localhost/api/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': 'invalid' }, body: '{}' }));
+    return response.status;
+  }, postMissingSignature: async () => {
+    const response = await exports.POST(new Request('http://localhost/api/stripe/webhook', { method: 'POST', body: '{}' }));
+    return response.status;
+  }, postOversized: async () => {
+    const response = await exports.POST(new Request('http://localhost/api/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': 'invalid' }, body: 'x'.repeat(1024 * 1024 + 1) }));
     return response.status;
   } };
 }
@@ -238,8 +249,14 @@ test('late expiration does not overwrite a paid Founder', async () => {
 });
 
 test('invalid signature receives HTTP 400', async () => {
-  const { postUnsigned } = setup();
+  const { postUnsigned, postMissingSignature } = setup();
   assert.equal(await postUnsigned(), 400);
+  assert.equal(await postMissingSignature(), 400);
+});
+
+test('oversized webhook receives HTTP 413 before signature verification', async () => {
+  const { postOversized } = setup();
+  assert.equal(await postOversized(), 413);
 });
 
 test('processing failure receives HTTP 500, then retry does not duplicate fulfillment', async () => {

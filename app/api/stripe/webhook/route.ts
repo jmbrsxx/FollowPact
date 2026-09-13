@@ -4,6 +4,7 @@ import { getBrevoTemplateId, sendTrackedEmail, syncBrevoContact } from "@/lib/br
 import { recordConversionSafely } from "@/lib/analytics";
 import { getStripe } from "@/lib/stripe";
 import { isPaidFoundingSession } from "@/lib/founding-payment";
+import { readLimitedBody, RequestBodyTooLarge } from "@/lib/request-body";
 import { callSupabaseRpc, supabaseRequest } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -194,12 +195,15 @@ async function processEvent(event: Stripe.Event) {
 export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!signature || !webhookSecret) return NextResponse.json({ error: "Stripe webhook is not configured." }, { status: 503 });
+  if (!webhookSecret) return NextResponse.json({ error: "Stripe webhook is not configured." }, { status: 503 });
+  if (!signature) return NextResponse.json({ error: "Missing webhook signature." }, { status: 400 });
 
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(await request.text(), signature, webhookSecret);
-  } catch {
+    const body = await readLimitedBody(request, 1024 * 1024);
+    event = getStripe().webhooks.constructEvent(body, signature, webhookSecret);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLarge) return NextResponse.json({ error: "Webhook payload is too large." }, { status: 413 });
     return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });
   }
 

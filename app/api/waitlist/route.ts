@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { sanitizeAttribution, recordConversionSafely } from "@/lib/analytics";
 import { getBrevoTemplateId, sendTrackedEmail, syncBrevoContact } from "@/lib/brevo";
+import { readLimitedBody, RequestBodyTooLarge } from "@/lib/request-body";
 import { callSupabaseRpc, supabaseRequest } from "@/lib/supabase";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,8 +18,9 @@ function isSameOrigin(request: Request) {
 }
 
 async function isRateLimited(request: Request) {
-  const ip = request.headers.get("x-nf-client-connection-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if (!ip) return false;
+  const ip = request.headers.get("x-nf-client-connection-ip") ||
+    (process.env.NODE_ENV === "production" ? null : request.headers.get("x-forwarded-for")?.split(",")[0]?.trim());
+  if (!ip) return process.env.NODE_ENV === "production";
   const salt = process.env.RATE_LIMIT_SALT;
   if (!salt) return process.env.NODE_ENV === "production";
   const key = createHash("sha256").update(`${salt}:${ip}`).digest("hex");
@@ -38,10 +40,11 @@ export async function POST(request: Request) {
 
   let body: { email?: unknown; company?: unknown; source?: unknown; marketingConsent?: unknown; utmSource?: unknown; utmMedium?: unknown; utmCampaign?: unknown };
   try {
-    const parsed: unknown = await request.json();
+    const parsed: unknown = JSON.parse(await readLimitedBody(request, 4096));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid body");
     body = parsed as typeof body;
-  } catch {
+  } catch (error) {
+    if (error instanceof RequestBodyTooLarge) return NextResponse.json({ error: "Request is too large." }, { status: 413 });
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
 
