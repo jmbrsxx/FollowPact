@@ -26,7 +26,7 @@ async function main() {
     const page = await browser.newPage({ locale: 'en-US' });
     for (let attempt = 1; attempt <= 3; attempt++) {
       await page.goto('https://followpact.netlify.app/checkout?source=presale-audit', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      if (!page.url().includes('/test_')) throw new Error('Checkout did not redirect to Stripe test mode');
+      if (!page.url().includes('/test_')) throw new Error(`Checkout did not redirect to Stripe test mode (host: ${new URL(page.url()).host})`);
       try {
         await page.locator('input[name="cardNumber"]').waitFor({ state: 'visible', timeout: 20000 });
         break;
@@ -55,8 +55,14 @@ async function main() {
       await page.waitForTimeout(9000);
       console.log(JSON.stringify({ scenario, step: 'challenge-completed' }));
     }
+    if (scenario !== '3ds-decline') {
+      await page.waitForURL(/followpact\.netlify\.app\/payment\/success\?session_id=/, { timeout: 60000 });
+    }
     const body = await page.locator('body').innerText();
-    console.log(JSON.stringify({ scenario, auditEmail: email, pageHost: new URL(page.url()).host, alerts: body.split('\n').filter(x => /declin|insufficient|authenticat|complete|success|thank|expired|error/i.test(x)).slice(-10) }));
+    console.log(JSON.stringify({ scenario, auditEmail: email, pageHost: new URL(page.url()).host,
+      successPath: page.url().includes('/payment/success?session_id='),
+      paymentReceived: body.includes('Payment received.'),
+      alerts: body.split('\n').filter(x => /declin|insufficient|authenticat|complete|success|thank|expired|error/i.test(x)).slice(-10) }));
   } finally {
     await browser?.close();
   }
