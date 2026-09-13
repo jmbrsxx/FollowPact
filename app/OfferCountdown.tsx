@@ -52,7 +52,7 @@ export default function OfferCountdown() {
         <strong>Founding offer ended</strong>
       ) : (
         <>
-          <strong>{remainingSeats} {remainingSeats === 1 ? "spot" : "spots"} left</strong>
+          <strong>25 spots left</strong>
           <span aria-hidden="true" />
           <p>
             Ends in <time dateTime={OFFER_END_ISO}>{timeLeft === null ? "-- days, -- hours, -- minutes, -- seconds" : formatTimeLeft(timeLeft)}</time>

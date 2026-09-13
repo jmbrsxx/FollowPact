@@ -20,7 +20,7 @@ function FounderOfferCard() {
     <p className="offer-card-price"><strong>$9.99</strong><span>Discounted founding price · One-time</span></p>
     <p className="offer-card-regular"><span>$21.99/month</span> regular price after the founding offer</p>
     <OfferCountdown />
-    <p className="offer-card-limit">Limited to 10 founding seats</p>
+    <p className="offer-card-limit">Limited to 25 founding seats</p>
     <ul className="founder-list">
       <li>Private beta by October 5 with all main features</li>
       <li>Full version access at release on November 5</li>

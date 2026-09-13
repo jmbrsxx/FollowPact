@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { getBrevoTemplateId, sendTrackedEmail, syncBrevoContact } from "@/lib/brevo";
 import { recordConversionSafely } from "@/lib/analytics";
 import { getStripe } from "@/lib/stripe";
+import { isPaidFoundingSession } from "@/lib/founding-payment";
 import { callSupabaseRpc, supabaseRequest } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -12,6 +13,7 @@ type StoredOrder = {
   purchaser_email: string;
   kind: "founding" | "subscription";
   status: string;
+  amount_total: number;
 };
 
 function id(value: string | { id: string } | null | undefined) {
@@ -39,7 +41,10 @@ async function savePendingSession(session: Stripe.Checkout.Session, status: "pen
   const email = expanded.customer_details?.email || expanded.customer_email;
   const priceId = expanded.line_items?.data[0]?.price?.id;
   if (!email || !priceId) return;
-  const kind = priceId === process.env.STRIPE_FOUNDING_PRICE_ID ? "founding" : "subscription";
+  if (priceId !== process.env.STRIPE_FOUNDING_PRICE_ID || expanded.mode !== "payment") return;
+  const kind = "founding";
+  const existing = await supabaseRequest<{ status: string }[]>(`orders?stripe_checkout_session_id=eq.${encodeURIComponent(expanded.id)}&select=status&limit=1`);
+  if (existing[0] && ["paid", "refunded"].includes(existing[0].status)) return;
 
   await supabaseRequest("orders?on_conflict=stripe_checkout_session_id", {
     method: "POST",
@@ -83,15 +88,17 @@ async function sendPurchaseMessages(email: string, kind: "founding" | "subscript
 }
 
 async function fulfillSession(input: Stripe.Checkout.Session) {
-  const session = input.line_items ? input : await expandedSession(input.id);
+  const session = await expandedSession(input.id);
   const email = session.customer_details?.email || session.customer_email;
   const priceId = session.line_items?.data[0]?.price?.id;
   if (!email || !priceId) throw new Error(`Checkout session ${session.id} is missing an email or price`);
-
-  const foundingPriceId = process.env.STRIPE_FOUNDING_PRICE_ID;
-  const monthlyPriceId = process.env.STRIPE_MONTHLY_PRICE_ID;
-  const kind = priceId === foundingPriceId ? "founding" : priceId === monthlyPriceId ? "subscription" : null;
-  if (!kind) throw new Error(`Checkout session ${session.id} contains an unknown Stripe price`);
+  if (!isPaidFoundingSession(session)) {
+    console.warn(`Ignoring Checkout session ${session.id}: it is not a paid $9.99 founding purchase`);
+    return;
+  }
+  const kind = "founding";
+  const existing = await supabaseRequest<{ status: string }[]>(`orders?stripe_checkout_session_id=eq.${encodeURIComponent(session.id)}&select=status&limit=1`);
+  if (existing[0]?.status === "refunded") return;
 
   const firstFulfillment = await callSupabaseRpc<boolean>("record_paid_order", {
     p_email: email.toLowerCase(),
@@ -110,18 +117,25 @@ async function fulfillSession(input: Stripe.Checkout.Session) {
   await sendPurchaseMessages(email.toLowerCase(), kind);
 }
 
-async function handleRefund(charge: Stripe.Charge) {
-  const paymentIntentId = id(charge.payment_intent);
+async function reconcileRefund(paymentIntentId: string | null) {
   if (!paymentIntentId) return;
-  const orders = await supabaseRequest<StoredOrder[]>(`orders?stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}&select=id,purchaser_email,kind,status&limit=1`);
+  const orders = await supabaseRequest<StoredOrder[]>(`orders?stripe_payment_intent_id=eq.${encodeURIComponent(paymentIntentId)}&select=id,purchaser_email,kind,status,amount_total&limit=1`);
   const order = orders[0];
-  if (!order || order.status === "refunded") return;
+  if (!order || order.kind !== "founding" || !["paid", "refunded"].includes(order.status)) return;
 
-  await supabaseRequest(`orders?id=eq.${encodeURIComponent(order.id)}`, {
+  const refunds = await getStripe().refunds.list({ payment_intent: paymentIntentId, limit: 100 });
+  if (refunds.has_more) throw new Error(`Too many refunds for ${paymentIntentId} to reconcile safely`);
+  const succeededAmount = refunds.data.filter((refund) => refund.status === "succeeded")
+    .reduce((total, refund) => total + refund.amount, 0);
+  const nextStatus = order.amount_total > 0 && succeededAmount >= order.amount_total ? "refunded" : "paid";
+  if (order.status === nextStatus) return;
+
+  const updated = await supabaseRequest<StoredOrder[]>(`orders?id=eq.${encodeURIComponent(order.id)}&status=eq.${order.status}`, {
     method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ status: "refunded", updated_at: new Date().toISOString() }),
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ status: nextStatus, updated_at: new Date().toISOString() }),
   });
+  if (!updated.length || nextStatus !== "refunded") return;
   await recordConversionSafely("refund_completed", { source: "stripe", referenceId: order.id });
   const templateId = getBrevoTemplateId("refund_confirmation");
   if (templateId) await sendTrackedEmail(order.purchaser_email, "refund_confirmation", templateId).catch((error) => console.error("Refund email failed", error));
@@ -159,7 +173,12 @@ async function processEvent(event: Stripe.Event) {
       await savePendingSession(event.data.object as Stripe.Checkout.Session, "canceled");
       break;
     case "charge.refunded":
-      await handleRefund(event.data.object as Stripe.Charge);
+      await reconcileRefund(id((event.data.object as Stripe.Charge).payment_intent));
+      break;
+    case "refund.created":
+    case "refund.updated":
+    case "refund.failed":
+      await reconcileRefund(id((event.data.object as Stripe.Refund).payment_intent));
       break;
     case "invoice.payment_failed":
       await handleInvoice(event.data.object as Stripe.Invoice, "failed");

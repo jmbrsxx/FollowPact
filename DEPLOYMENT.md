@@ -18,7 +18,9 @@ The `conversion_summary` view gives event totals. The protected `GET /api/admin/
 
 Create this product and price in Stripe test mode first:
 
-- Founding access: `$9.99 USD`, one time. Set its Payment Link purchase limit to 10 completed purchases.
+- Founding access: `$9.99 USD`, one time. Set its Payment Link purchase limit to 25 completed purchases. Keep the old $6.78 Price and Payment Link inactive.
+
+If paid Founder orders already exist when enabling the restriction, reduce the link limit by that count. The test-mode `scripts/set-test-link-limit.cjs` script calculates this from Supabase and Stripe; it never accepts a live Stripe key.
 
 For the founding Payment Link, require customer email, enable Stripe receipts, and use this post-payment redirect:
 
@@ -37,8 +39,13 @@ Subscribe it to:
 - `checkout.session.async_payment_failed`
 - `checkout.session.expired`
 - `charge.refunded`
+- `refund.created`
+- `refund.updated`
+- `refund.failed`
 
 Save its signing secret as `STRIPE_WEBHOOK_SECRET`. Stripe webhooks—not the success page—fulfill orders. Event IDs and Checkout Session IDs are unique in Supabase, so Stripe retries do not consume another seat or send fulfillment twice.
+
+For an existing Supabase deployment, run `supabase/fix-refunded-order-fulfillment.sql` in the SQL editor before deploying this webhook change. It prevents a replayed checkout event from restoring a fully refunded order to paid. Refunds are reconciled from Stripe: partial, pending, and failed refunds keep Founder access; only successfully refunded amounts totaling the full order revoke it. The application does not issue refunds. When issuing a refund in Stripe, choose the full remaining amount. Stripe Dashboard can still issue a partial refund manually, so access reconciliation must remain in place.
 
 Before launch, repeat the setup in live mode and replace the test key, Price ID, link, and webhook secret together. Run one low-value live purchase and refund. Founding purchases never convert to a subscription automatically.
 
@@ -87,6 +94,8 @@ npm run build
 
 Test the waitlist with valid and invalid email addresses, missing consent, a filled honeypot, sixth request in one minute, duplicate signup, resubscription, disabled Supabase, disabled Brevo, retry, confirmation delivery, and an unsubscribe webhook.
 
-Use Stripe CLI and test cards for successful, declined, delayed, and failed payments; an invalid signature; duplicate webhook delivery; refund; the tenth founding purchase; and closure after the deadline. Verify an eleventh founding checkout cannot complete through Stripe’s purchase limit and that `/checkout` directs visitors to the waitlist after the offer closes.
+Use Stripe CLI and test cards for successful, declined, delayed, and failed payments; an invalid signature; duplicate webhook delivery; full, partial, pending, and failed refunds; the 25th founding purchase; and closure after the deadline. Verify a 26th founding checkout cannot complete through Stripe’s purchase limit and that `/checkout` directs visitors to the waitlist after the offer closes.
+
+The landing page intentionally displays the fixed phrase “25 spots left” while `/checkout` and the Stripe Payment Link still enforce their configured limits.
 
 Verify the Cloudflare beacon is absent with no public token and visible after configuration. Confirm UTM values are sanitized, checkout starts are recorded, purchase conversions appear only after a verified payment webhook, and secrets do not appear in browser bundles or API responses.

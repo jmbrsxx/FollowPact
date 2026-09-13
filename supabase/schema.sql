@@ -154,6 +154,7 @@ declare was_fulfilled boolean;
 begin
   select fulfilled_at is not null into was_fulfilled from public.orders where stripe_checkout_session_id = p_checkout_session_id for update;
   if found then
+    if was_fulfilled then return false; end if;
     update public.orders set purchaser_email = p_email, stripe_customer_id = p_customer_id,
       stripe_payment_intent_id = p_payment_intent_id, stripe_subscription_id = p_subscription_id,
       stripe_price_id = p_price_id, kind = p_kind, amount_total = p_amount_total,
