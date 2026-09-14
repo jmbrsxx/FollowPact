@@ -49,6 +49,17 @@ For an existing Supabase deployment, run `supabase/fix-refunded-order-fulfillmen
 
 Before launch, repeat the setup in live mode and replace the test key, Price ID, link, and webhook secret together. Run one low-value live purchase and refund. Founding purchases never convert to a subscription automatically.
 
+### Live Stripe activation, step by step
+
+1. Complete Stripe's account activation and confirm the Dashboard is in **Live mode**. Create or copy a **one-time $9.99 USD** Price; its live `price_...` ID is different from the test Price ID.
+2. Create a **live Payment Link** with exactly one of that Price, fixed quantity one, no optional items, promotion codes, or automatic tax. Limit completed payments to the remaining founding seats (25 minus already paid, non-refunded live Founder orders). Set **After payment → Redirect** to `https://followpact.netlify.app/payment/success?session_id={CHECKOUT_SESSION_ID}`. Copy the live `https://buy.stripe.com/...` URL.
+3. Create a **live webhook destination** for `https://followpact.netlify.app/api/stripe/webhook` and the eight checkout/refund events listed above. Copy this destination's own `whsec_...` signing secret; a test webhook secret will not work for live events.
+4. In **Netlify → Site configuration → Environment variables**, set `STRIPE_SECRET_KEY` (`sk_live_...`), `STRIPE_FOUNDING_PRICE_ID`, `STRIPE_FOUNDING_PAYMENT_LINK`, and `STRIPE_WEBHOOK_SECRET` for the **Production** context. Deploy production so the server picks up all four together. Keep `.env.local` and deploy previews in test mode.
+5. Before sharing the link, run `node --env-file=<private-live-env-file> scripts/check-stripe-readiness.cjs --live` from a private local environment containing those four values and `NEXT_PUBLIC_SITE_URL`. The command reads Stripe objects, prints no secret values, and checks the Price, Payment Link, redirect, purchase limit, and webhook event subscriptions. It cannot verify that `STRIPE_WEBHOOK_SECRET` is the matching signing secret; verify a delivered event in the Stripe Dashboard after the next step.
+6. Open the deployed `/checkout` route and make **one real $9.99 purchase** with an inbox and payment method you control. Confirm Stripe shows a successful **live** payment, its webhook delivery returns HTTP 200, Supabase `orders` has one `paid` founding order for that Checkout Session, and the purchase email arrives. Refund it in the Stripe Dashboard and confirm the order becomes `refunded`. A test card cannot prove live payments work.
+
+The app intentionally returns **Checkout unavailable** if the key, webhook secret, Price ID, and Payment Link are incomplete or if a test link is paired with a live key (or the reverse). A Payment Link can still be opened directly, so deactivate it in Stripe when the offer closes.
+
 ## 3. Brevo and Gmail replies
 
 1. Create a Brevo Free account and a marketing list.
@@ -66,9 +77,7 @@ Marketing campaigns should be sent only from the Brevo dashboard to the configur
 
 ## 4. Cloudflare Web Analytics
 
-1. Add `followpact.netlify.app` as a Cloudflare Web Analytics site. DNS does not need to move to Cloudflare.
-2. Copy the site token into `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN`.
-3. Deploy. The root layout adds the beacon only when the token exists.
+The Cloudflare Web Analytics beacon and site token are included in `app/layout.tsx` for every page. Deploy the site, then confirm traffic appears for `followpact.netlify.app` in Cloudflare Web Analytics. DNS does not need to move to Cloudflare.
 
 Use Cloudflare’s dashboard for page views, visitors, referrers, countries, browsers, devices, and real-user performance. Supabase stores only trusted server-side funnel conversions and sanitized UTM values. It does not store full IP addresses, browser fingerprints, or card data.
 
@@ -99,7 +108,7 @@ Use Stripe CLI and test cards for successful, declined, delayed, and failed paym
 
 The landing page intentionally displays the fixed phrase “25 spots left” while `/checkout` and the Stripe Payment Link still enforce their configured limits.
 
-Verify the Cloudflare beacon is absent with no public token and visible after configuration. Confirm UTM values are sanitized, checkout starts are recorded, purchase conversions appear only after a verified payment webhook, and secrets do not appear in browser bundles or API responses.
+Verify the Cloudflare beacon contains the configured site token exactly once. Confirm UTM values are sanitized, checkout starts are recorded, purchase conversions appear only after a verified payment webhook, and secrets do not appear in browser bundles or API responses.
 
 ## Security gate before live payments
 

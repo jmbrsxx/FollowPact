@@ -17,6 +17,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const cloudflareToken = process.env.NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN;
-  return <html lang="en"><body>{children}{cloudflareToken ? <Script src="https://static.cloudflareinsights.com/beacon.min.js" strategy="afterInteractive" data-cf-beacon={JSON.stringify({ token: cloudflareToken })} /> : null}</body></html>;
+  return <html lang="en"><body>{children}<Script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" strategy="afterInteractive" data-cf-beacon={JSON.stringify({ token: "af5dfe7839554eb885842183edd5750b" })} /></body></html>;
 }
